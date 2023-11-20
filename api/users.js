@@ -1,10 +1,11 @@
 const express = require('express');
 const usersRouter = express.Router();
-
+const { JWT_SECRET="nevertell" } = process.env;
 const { 
   createUser,
   getAllUsers,
   getUserByUsername,
+  getUser
 } = require('../db');
 
 const jwt = require('jsonwebtoken');
@@ -33,13 +34,13 @@ usersRouter.post('/login', async (req, res, next) => {
   }
 
   try {
-    const user = await getUserByUsername(username);
-
-    if (user && user.password == password) {
+    const user = await getUser(username,password);
+    console.log(user);
+    if (user) {
       const token = jwt.sign({ 
         id: user.id, 
-        username
-      }, process.env.JWT_SECRET, {
+        username:user.username
+      }, JWT_SECRET, {
         expiresIn: '1w'
       });
 
@@ -81,8 +82,8 @@ usersRouter.post('/register', async (req, res, next) => {
 
     const token = jwt.sign({ 
       id: user.id, 
-      username
-    }, process.env.JWT_SECRET, {
+      username:user.username
+    }, JWT_SECRET, {
       expiresIn: '1w'
     });
 

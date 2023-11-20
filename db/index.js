@@ -1,7 +1,8 @@
 const { Client } = require('pg') // imports the pg module
-
+const SALT_COUNT = 10;
+const bcrypt = require('bcrypt');
 const client = new Client({
-  connectionString: process.env.DATABASE_URL || 'postgres://localhost:5432/juicebox-dev',
+  connectionString: process.env.DATABASE_URL || 'postgres://localhost:5432/juicebox2',
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined,
 });
 
@@ -15,13 +16,14 @@ async function createUser({
   name,
   location
 }) {
+  const hashedPassword = await bcrypt.hash(password, SALT_COUNT);
   try {
     const { rows: [ user ] } = await client.query(`
-      INSERT INTO users(username, password, name) 
-      VALUES($1, $2, $3) 
+      INSERT INTO users(username, password, name,location) 
+      VALUES($1, $2, $3,$4) 
       ON CONFLICT (username) DO NOTHING 
       RETURNING *;
-    `, [username, password, name, location]);
+    `, [username, hashedPassword, name, location]);
 
     return user;
   } catch (error) {
@@ -98,11 +100,8 @@ async function getUserByUsername(username) {
       WHERE username=$1
     `, [ username ]);
 
-    if (!user) {
-      throw {
-        name: "UserNotFoundError",
-        message: "A user with that username does not exist"
-      }
+    if(!user){
+      return;
     }
 
     return user;
@@ -111,6 +110,27 @@ async function getUserByUsername(username) {
   }
 }
 
+async function getUser(username,password) {
+  try {
+    const { rows: [ user ] } = await client.query(`
+      SELECT *
+      FROM users
+      WHERE username=$1
+    `, [ username ]);
+
+    if(!user){
+      return;
+    }
+    const hashedpassword=user.password;
+    const passwordMatch=await bcrypt.compare(password,hashedpassword);
+
+     if(!passwordMatch) return;
+     delete user.password;
+    return user;
+  } catch (error) {
+    throw error;
+  }
+}
 /**
  * POST Methods
  */
@@ -370,5 +390,6 @@ module.exports = {
   createTags,
   getAllTags,
   createPostTag,
-  addTagsToPost
+  addTagsToPost,
+  getUser
 }
